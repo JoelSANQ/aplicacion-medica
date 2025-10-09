@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
+import 'screens/appointment_home.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,7 +50,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       try {
-        UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        final userCredential = await _auth.signInWithEmailAndPassword(
           email: emailController.text.trim(),
           password: passwordController.text.trim(),
         );
@@ -57,19 +58,31 @@ class _LoginPageState extends State<LoginPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Bienvenido ${userCredential.user!.email}")),
         );
-      } on FirebaseAuthException catch (e) {
-        String message = "";
 
-        if (e.code == "user-not-found") {
-          message = "Usuario no encontrado";
-        } else if (e.code == "wrong-password") {
-          message = "Contraseña incorrecta";
-        } else if (e.code == "invalid-email") {
-          message = "Correo inválido";
-        } else {
-          message = "Error: ${e.message}";
+        // >>> Ir a la pantalla de Bienvenida/Citas
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AppointmentHomePage()),
+          );
         }
-
+      } on FirebaseAuthException catch (e) {
+        String message;
+        switch (e.code) {
+          case "user-not-found":
+            message = "Usuario no encontrado";
+            break;
+          case "wrong-password":
+            message = "Contraseña incorrecta";
+            break;
+          case "invalid-email":
+            message = "Correo inválido";
+            break;
+          case "user-disabled":
+            message = "Usuario deshabilitado";
+            break;
+          default:
+            message = "Error: ${e.message}";
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
@@ -84,6 +97,13 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  // >>> “Crear cuenta” debe ir a RegisterPage (no a Home)
+  void _goToRegister() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const RegisterPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -93,7 +113,6 @@ class _LoginPageState extends State<LoginPage> {
           padding: const EdgeInsets.all(24.0),
           child: Container(
             decoration: BoxDecoration(
-              // 🔹 Fondo personalizado
               gradient: const LinearGradient(
                 colors: [Color(0xFFE3F2FD), Color.fromARGB(255, 219, 248, 248)],
                 begin: Alignment.topLeft,
@@ -115,32 +134,20 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.local_hospital,
-                      size: 72,
-                      color: Color.fromARGB(255, 207, 45, 45),
-                    ),
+                    const Icon(Icons.local_hospital, size: 72, color: Color.fromARGB(255, 207, 45, 45)),
                     const SizedBox(height: 16),
                     const Text(
                       "Appointment App",
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(255, 54, 124, 216),
-                      ),
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 54, 124, 216)),
                     ),
-                    // 🔹 Subtítulo debajo del título
                     const SizedBox(height: 8),
                     const Text(
                       "Accede con tu correo y contraseña",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color.fromARGB(255, 29, 24, 24),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color.fromARGB(255, 29, 24, 24)),
                     ),
                     const SizedBox(height: 32),
 
-                    // Campo correo
+                    // Correo
                     TextFormField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -149,18 +156,14 @@ class _LoginPageState extends State<LoginPage> {
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return "Por favor ingresa tu correo";
-                        }
-                        if (!value.contains("@")) {
-                          return "Correo inválido";
-                        }
+                        if (value == null || value.isEmpty) return "Por favor ingresa tu correo";
+                        if (!value.contains("@")) return "Correo inválido";
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
 
-                    // Campo contraseña
+                    // Contraseña
                     TextFormField(
                       controller: passwordController,
                       obscureText: _obscurePassword,
@@ -168,116 +171,197 @@ class _LoginPageState extends State<LoginPage> {
                         labelText: "Contraseña",
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
+                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return "Por favor ingresa tu contraseña";
-                        }
-                        if (value.length < 6) {
-                          return "Debe tener al menos 6 caracteres";
-                        }
+                        if (value == null || value.isEmpty) return "Por favor ingresa tu contraseña";
+                        if (value.length < 6) return "Debe tener al menos 6 caracteres";
                         return null;
                       },
                     ),
                     const SizedBox(height: 24),
 
-// Botón de crear cuenta
-                SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              const Color.fromARGB(255, 115, 212, 224),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: _login,
-                        child: const Text(
-                          "Crear cuenta ",
-                          style: TextStyle(fontSize: 16, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-
-
-
-                    // Botón de login
+                    // Crear cuenta -> navega a pantalla de registro
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              const Color.fromARGB(255, 115, 212, 224),
+                          backgroundColor: const Color.fromARGB(255, 115, 212, 224),
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: _login,
-                        child: const Text(
-                          "Ingresar",
-                          style: TextStyle(fontSize: 16, color: Colors.white),
-                        ),
+                        onPressed: _goToRegister,
+                        child: const Text("Crear cuenta", style: TextStyle(fontSize: 16,  fontWeight: FontWeight.bold, color: Colors.white)),
                       ),
                     ),
                     const SizedBox(height: 16),
 
-                    // Enlace de registro
-                    TextButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                "Funcionalidad de registro no implementada."),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        "¿No tienes cuenta? Regístrate",
-                        style:
-                            TextStyle(color: Color.fromARGB(255, 39, 52, 243)),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Botón cerrar sesión
+                    // Ingresar
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              const Color.fromARGB(255, 95, 216, 247),
+                          backgroundColor: const Color.fromARGB(255, 115, 212, 224),
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _login,
+                        child: const Text("Ingresar", style: TextStyle(fontSize: 16,  fontWeight: FontWeight.bold, color: Colors.white)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // (Texto de registro eliminado)
+
+                    // Cerrar sesión
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color.fromARGB(255, 115, 212, 224),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: _signOut,
-                        child: const Text(
-                          'Cerrar sesión',
-                          style: TextStyle(fontSize: 16, color: Colors.white),
-                        ),
+                        child: const Text('Cerrar sesión', style: TextStyle(fontSize: 16,  fontWeight: FontWeight.bold, color: Colors.white)),
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ===== Pantalla de Registro =====
+class RegisterPage extends StatefulWidget {
+  const RegisterPage({super.key});
+
+  @override
+  State<RegisterPage> createState() => _RegisterPageState();
+}
+
+class _RegisterPageState extends State<RegisterPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _obscure1 = true;
+  bool _obscure2 = true;
+  bool _loading = false;
+
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _loading = true);
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _email.text.trim(),
+        password: _password.text.trim(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Cuenta creada correctamente. Inicia sesión.")),
+        );
+        Navigator.of(context).pop(); // ← vuelve al LoginPage
+      }
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case "email-already-in-use":
+          message = "Ese correo ya está registrado";
+          break;
+        case "invalid-email":
+          message = "Correo inválido";
+          break;
+        case "weak-password":
+          message = "Contraseña muy débil";
+          break;
+        default:
+          message = "Error: ${e.message}";
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Crear cuenta")),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: "Correo electrónico",
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return "Ingresa tu correo";
+                    if (!v.contains("@")) return "Correo inválido";
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _password,
+                  obscureText: _obscure1,
+                  decoration: InputDecoration(
+                    labelText: "Contraseña",
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscure1 ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _obscure1 = !_obscure1),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return "Ingresa una contraseña";
+                    if (v.length < 6) return "Mínimo 6 caracteres";
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _confirm,
+                  obscureText: _obscure2,
+                  decoration: InputDecoration(
+                    labelText: "Confirmar contraseña",
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscure2 ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _obscure2 = !_obscure2),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return "Confirma tu contraseña";
+                    if (v != _password.text) return "Las contraseñas no coinciden";
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _loading ? null : _register,
+                    child: Text(_loading ? "Creando..." : "Crear cuenta"),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
