@@ -1,3 +1,4 @@
+import 'package:app/screens/APPOINTMENTS.DART';
 import 'package:flutter/material.dart';
 import 'screens/appointment_home.dart';
 import 'screens/ProfilePage.dart';
@@ -11,6 +12,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String profile = '/profile';
   static const String consejos = '/consejos';
+    static const String citas = '/citas';
 
   static Map<String, WidgetBuilder> routes = {
     login: (context) => const LoginPage(),
@@ -18,6 +20,7 @@ class AppRoutes {
     home: (context) => const AppointmentHomePage(),
     profile: (context) => const ProfilePage(),
     consejos: (context) => const HealthTipsPage(),
+    citas: (context) => const MyAppointmentsPage(),
      
   };
 }
