@@ -1,11 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'ProfilePage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'LoginPage.dart';
-import 'advice.dart';
 import 'package:app/routes.dart';
 import 'package:app/screens/messages.dart';
+import 'Settings.dart';
 
 class _MyScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -112,14 +113,12 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
     final homeBody = ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // BIENVENIDA (tappable a Perfil)
+        // === BLOQUE BIENVENIDA TOCABLE (con nombre desde Firestore) ===
         Material(
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: () {
-               Navigator.pushNamed(context, AppRoutes.profile);
-            },
+            onTap: () => Navigator.pushNamed(context, AppRoutes.profile),
             child: Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
@@ -128,6 +127,9 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))
+                ],
               ),
               padding: const EdgeInsets.all(20),
               child: Row(
@@ -135,13 +137,37 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                   const CircleAvatar(radius: 28, child: Icon(Icons.person, size: 28)),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Bienvenido',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text(email, style: const TextStyle(fontSize: 14, color: Colors.black54)),
-                      ],
+                    child: StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('usuarios')
+                          .doc(FirebaseAuth.instance.currentUser?.uid)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final email = FirebaseAuth.instance.currentUser?.email ?? 'Usuario';
+                        final data = snapshot.data?.data() as Map<String, dynamic>?;
+                        final nombre = (data?['nombre'] ?? '').toString().trim();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Bienvenido ${nombre.isNotEmpty ? nombre : ''}',
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '¿En qué podemos ayudarte hoy?',
+                              style: const TextStyle(fontSize: 14, color: Colors.black87),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              email,
+                              style: const TextStyle(fontSize: 13, color: Colors.black54),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                   const Icon(Icons.arrow_forward_ios, size: 18),
@@ -150,15 +176,26 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
             ),
           ),
         ),
+
         const SizedBox(height: 16),
 
-        Row(
+                Row(
           children: [
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () => noImpl('Crear cita'),
                 icon: const Icon(Icons.add_circle_outline),
-                label: const Text('Crear cita', style: TextStyle(fontWeight: FontWeight.bold), ),
+                label: const Text(
+                  'Crear cita',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  elevation: 6, // intensidad de la sombra (más alto = más notoria)
+                  shadowColor: Colors.black45, // color de la sombra
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -166,38 +203,51 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
               child: ElevatedButton.icon(
                 onPressed: () => noImpl('Mis citas'),
                 icon: const Icon(Icons.calendar_month),
-                label: const Text('Mis citas'),
+                label: const Text(
+                  'Mis citas',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  elevation: 6,
+                  shadowColor: Colors.black45,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
           ],
         ),
-     const SizedBox(width: 10, height: 12),
 
-Align(
-  alignment: Alignment.center, 
-  child: SizedBox(
-    width: 220, 
-    child: ElevatedButton.icon(
-      onPressed: () => Navigator.pushNamed(context, AppRoutes.consejos),
-      icon: const Icon(Icons.lightbulb_outline, size: 20),
-      label: const Text(
-        'Consejos de salud',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-      ),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+
+        const SizedBox(width: 10, height: 12),
+
+        Align(
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: 220,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.consejos),
+              icon: const Icon(Icons.lightbulb_outline, size: 20),
+              label: const Text(
+                'Consejos de salud',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
-    ),
-  ),
-),
 
-const SizedBox(height: 30),
-const Text('Especialistas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-const SizedBox(height: 8),
+        const SizedBox(height: 30),
+        const Text('Especialistas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+
         // Carrusel Especialistas
         ScrollConfiguration(
           behavior: _MyScrollBehavior(),
@@ -257,15 +307,13 @@ const SizedBox(height: 8),
     );
 
     // Cuerpos simples para otras pestañas (placeholders)
-    final messagesBody = const MessagesPage(
-    );
+    final messagesBody = const MessagesPage();
     final scheduleBody = _PlaceholderTab(
       icon: Icons.calendar_month,
       title: 'Calendario',
       subtitle: 'Tu calendario y recordatorios de citas.',
     );
-    final settingsBody =  const ProfilePage()
-    ;
+    final settingsBody = const SettingsPage();
 
     Widget currentBody;
     switch (_navIndex) {
@@ -282,25 +330,27 @@ const SizedBox(height: 8),
         currentBody = homeBody;
     }
 
-return Scaffold(
-  appBar: _navIndex == 3 ? null : AppBar(title: const Text('Citas Médicas')),
-  body: currentBody,
-  bottomNavigationBar: BottomNavigationBar(
-    currentIndex: _navIndex,
-    onTap: (i) => setState(() => _navIndex = i),
-    type: BottomNavigationBarType.fixed,
-    showUnselectedLabels: true,
-    selectedItemColor: const Color(0xFF7E57C2),
-    unselectedItemColor: Colors.black45,
-    items: const [
-      BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-      BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Mensajes'),
-      BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Calendario'),
-      BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Ajustes'),
-    ],
-  ),
-);  }
+    return Scaffold(
+      appBar: _navIndex == 3 ? null : AppBar(title: const Text('Citas Médicas')),
+      body: currentBody,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _navIndex,
+        onTap: (i) => setState(() => _navIndex = i),
+        type: BottomNavigationBarType.fixed,
+        showUnselectedLabels: true,
+        selectedItemColor: const Color(0xFF7E57C2),
+        unselectedItemColor: Colors.black45,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Mensajes'),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Calendario'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Ajustes'),
+        ],
+      ),
+    );
+  }
 }
+
 class _PlaceholderTab extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -325,7 +375,9 @@ class _PlaceholderTab extends StatelessWidget {
               const SizedBox(height: 12),
               Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
-              Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+              Text(subtitle,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.black54)),
             ],
           ),
         ),

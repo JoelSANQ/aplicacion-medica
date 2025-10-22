@@ -60,8 +60,8 @@ class _MessagesPageState extends State<MessagesPage> {
     return Scaffold(
       body: Column(
         children: [
-          // 🔍 Buscador
           Padding(
+            
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchCtrl,
@@ -83,47 +83,65 @@ class _MessagesPageState extends State<MessagesPage> {
 
           // 💬 Lista de chats más grande
           Expanded(
-            child: ListView.builder(
-              itemCount: chatsFiltered.length,
-              itemBuilder: (context, index) {
-                final chat = chatsFiltered[index];
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  leading: CircleAvatar(
-                    radius: 28,
-                    backgroundColor: const Color(0xFFEDE7F6),
-                    child: Text(chat['avatar']!, style: const TextStyle(fontSize: 24)),
-                  ),
-                  title: Text(
-                    chat['name']!,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                  subtitle: Text(
-                    chat['lastMsg']!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.black54, fontSize: 15),
-                  ),
-                  trailing: Text(
-                    chat['time']!,
-                    style: const TextStyle(color: Colors.black45, fontSize: 14),
-                  ),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatDetailPage(
-                        doctor: chat['name']!,
-                        specialty: chat['specialty']!,
-                      ),
-                    ),
-                  ),
-                );
-              },
+  child: ListView.builder(
+    itemCount: chatsFiltered.length,
+    itemBuilder: (context, index) {
+      final chat = chatsFiltered[index];
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE0F7FA), // 💠 Fondo turquesa claro
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.black, width: 1.2), // 🖤 Borde negro
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 6,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          leading: CircleAvatar(
+            radius: 28,
+            backgroundColor: const Color(0xFF00BCD4), // 💧Turquesa más fuerte
+            child: Text(
+              chat['avatar']!,
+              style: const TextStyle(fontSize: 24, color: Colors.white),
             ),
           ),
-        ],
+          title: Text(
+            chat['name']!,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black87),
+          ),
+          subtitle: Text(
+            chat['lastMsg']!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.black54, fontSize: 15),
+          ),
+          trailing: Text(
+            chat['time']!,
+            style: const TextStyle(color: Colors.black45, fontSize: 14),
+          ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatDetailPage(
+                doctor: chat['name']!,
+                specialty: chat['specialty']!,
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+   ),
+)       ],
       ),
     );
+
   }
 }
 
