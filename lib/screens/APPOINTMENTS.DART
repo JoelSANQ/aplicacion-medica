@@ -77,12 +77,15 @@ class DoctorAvailability {
 
   factory DoctorAvailability.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final inicio = (data['horaInicio'] as Timestamp).toDate();
+    // Si no existiera 'horaFin' en el doc, usamos +1h por defecto para no romper UI
+    final fin = (data['horaFin'] as Timestamp?)?.toDate() ?? inicio.add(const Duration(hours: 1));
     return DoctorAvailability(
       id: doc.id,
       medicoId: (data['medicoId'] ?? '').toString(),
       fecha: (data['fecha'] as Timestamp).toDate(),
-      horaInicio: (data['horaInicio'] as Timestamp).toDate(),
-      horaFin: (data['horaFin'] as Timestamp).toDate(),
+      horaInicio: inicio,
+      horaFin: fin,
       estaDisponible: (data['esta_disponible'] ?? true) as bool,
     );
   }
@@ -103,7 +106,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
   DateTime? _startDate;
   DateTime? _endDate;
 
-  // Sección "Disponibilidad": elegir médico y luego día para checar si hay huecos libres
+  // Sección "Disponibilidad": elegir médico y luego día para ver bloques de 1h
   static const _medicos = <Map<String, String>>[
     {'id': 'dr_lopez', 'nombre': 'Dr. López'},
     {'id': 'dra_martinez', 'nombre': 'Dra. Martínez'},
@@ -118,8 +121,24 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
   String? _resultadoDia; // texto “Disponible / Ocupado / Sin registros”
 
   String _fmtFecha(DateTime d) => DateFormat('dd/MM/yyyy').format(d);
-  String _fmtHora(DateTime d)  => DateFormat('hh:mm a').format(d);
+  String _fmtHora(DateTime d) => DateFormat('HH:mm').format(d);
   DateTime _onlyDate(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  // --- CONFIGURACIÓN HORARIA PARA BLOQUES DE 1 HORA ---
+  final int _inicioJornada = 8;  // 08:00
+  final int _finJornada = 20;    // 20:00 (exclusivo)
+  // Si no hay documentos de catálogo para ese día, ¿mostramos todos los bloques menos los ocupados explícitos?
+  final bool _inferirSiNoHayCatalogo = true;
+
+  // Genera todos los DateTime inicio de cada bloque de 1h.
+  List<DateTime> _generarBloquesDeHora(DateTime day) {
+    final base = DateTime(day.year, day.month, day.day);
+    final slots = <DateTime>[];
+    for (var h = _inicioJornada; h < _finJornada; h++) {
+      slots.add(base.add(Duration(hours: h)));
+    }
+    return slots;
+  }
 
   Query _appointmentsQuery() {
     Query q = FirebaseFirestore.instance
@@ -218,7 +237,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
 
       if (snap.docs.isEmpty) {
         setState(() => _resultadoDia =
-            'Sin registros para ${_fmtFecha(fechaSolo)} (aún no hay bloques creados).');
+            'Sin registros para ${_fmtFecha(fechaSolo)} (se aplicará jornada ${_inicioJornada}:00–${_finJornada}:00).');
         return;
       }
 
@@ -341,8 +360,8 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                   }
 
                   final fecha = inicio == null ? '—' : DateFormat('dd/MM/yyyy').format(inicio);
-                  final horaInicio = inicio == null ? '—' : _fmtHora(inicio);
-                  final horaFin = fin == null ? '—' : _fmtHora(fin);
+                  final horaInicio = inicio == null ? '—' : DateFormat('HH:mm').format(inicio);
+                  final horaFin = fin == null ? '—' : DateFormat('HH:mm').format(fin);
 
                   return Dismissible(
                     key: ValueKey(d.id),
@@ -459,20 +478,24 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
 
           const SizedBox(height: 10),
 
-          // Lista plana de bloques disponibles del médico (si hay médico elegido)
+          // ===================== BLOQUES DE 1 HORA POR DÍA (FILTRANDO OCUPADOS) =====================
           if (_medicoSeleccionado == null)
             const Padding(
               padding: EdgeInsets.all(16.0),
               child: Text('Selecciona un médico para ver bloques de disponibilidad.'),
+            )
+          else if (_diaSeleccionado == null)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Elige un día para ver la disponibilidad.'),
             )
           else
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('disponibilidad_medicos')
                   .where('medicoId', isEqualTo: _medicoSeleccionado)
-                  .where('esta_disponible', isEqualTo: true)
-                  .get() // <- sin orderBy para evitar índices
-                  .asStream(),
+                  .where('fecha', isEqualTo: Timestamp.fromDate(_onlyDate(_diaSeleccionado!)))
+                  .snapshots(),
               builder: (context, snap) {
                 if (snap.hasError) {
                   return Padding(
@@ -488,40 +511,111 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                 }
 
                 final docs = snap.data!.docs;
-                if (docs.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: Text('No hay bloques disponibles.')),
-                  );
+
+                // Mapa inicio->disponible (true/false)
+                final Map<DateTime, bool> estadoPorInicio = {};
+                for (final d in docs) {
+                  final data = d.data() as Map<String, dynamic>;
+                  final tsInicio = data['horaInicio'] as Timestamp?;
+                  if (tsInicio == null) continue;
+                  final start = tsInicio.toDate();
+                  final disponible = (data['esta_disponible'] ?? true) as bool;
+                  estadoPorInicio[start] = disponible;
                 }
 
-                // Agrupar por día y mostrar
-                final byDay = <DateTime, List<DoctorAvailability>>{};
-                for (final d in docs) {
-                  final slot = DoctorAvailability.fromDoc(d);
-                  final key = _onlyDate(slot.fecha);
-                  byDay.putIfAbsent(key, () => []).add(slot);
+                final todosLosBloques = _generarBloquesDeHora(_diaSeleccionado!);
+
+                final bool hayCatalogo = docs.isNotEmpty;
+                final visibles = <DateTime>[];
+                for (final s in todosLosBloques) {
+                  final disponibleFlag = estadoPorInicio[s];
+                  if (hayCatalogo) {
+                    if (disponibleFlag == true) visibles.add(s);
+                  } else if (_inferirSiNoHayCatalogo) {
+                    // Si no hay docs, mostramos todos salvo los que explícitamente estén false
+                    if (disponibleFlag != false) visibles.add(s);
+                  }
                 }
-                final days = byDay.keys.toList()..sort();
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
                   child: Column(
-                    children: days.map((day) {
-                      final slots = byDay[day]!;
-                      slots.sort((a, b) => a.horaInicio.compareTo(b.horaInicio));
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        child: ListTile(
-                          title: Text('Disponible el ${_fmtFecha(day)}'),
-                          subtitle: Text(
-                            slots
-                                .map((s) => '${_fmtHora(s.horaInicio)}–${_fmtHora(s.horaFin)}')
-                                .join('   •   '),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (visibles.isEmpty)
+                        Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                          child: ListTile(
+                            leading: const Icon(Icons.event_busy),
+                            title: Text('Sin bloques disponibles el ${_fmtFecha(_diaSeleccionado!)}'),
+                            subtitle: const Text('Intenta con otro día u otro médico.'),
+                          ),
+                        )
+                      else
+                        Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 6),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Disponibles el ${_fmtFecha(_diaSeleccionado!)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: visibles.map((s) {
+                                final etiqueta =
+                                    '${_fmtHora(s)} - ${_fmtHora(s.add(const Duration(hours: 1)))}';
+                                return FilterChip(
+                                  selected: false,
+                                  label: Text(etiqueta),
+                                  avatar: const Icon(Icons.schedule, size: 18),
+                                  onSelected: (_) async {
+                                    // Aquí puedes abrir tu diálogo de crear cita con el bloque prefijado.
+                                    // Si prefieres reservar directo, escribe en Firestore aquí.
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Bloque seleccionado: $etiqueta')),
+                                    );
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+
+                      // (Opcional) Mostrar también los ocupados para referencia
+                      if (estadoPorInicio.values.any((v) => v == false))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Ocupados', style: TextStyle(fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: estadoPorInicio.entries
+                                    .where((e) => e.value == false)
+                                    .map((e) {
+                                  final s = e.key;
+                                  final etiqueta =
+                                      '${_fmtHora(s)} - ${_fmtHora(s.add(const Duration(hours: 1)))}';
+                                  return Chip(
+                                    label: Text(etiqueta),
+                                    avatar: const Icon(Icons.lock_clock, size: 18),
+                                    backgroundColor: Colors.grey.shade200,
+                                  );
+                                }).toList(),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    }).toList(),
+                    ],
                   ),
                 );
               },
