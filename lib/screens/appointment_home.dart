@@ -354,7 +354,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
         const SizedBox(height: 8),
 
         if (user == null)
-          const Text('Inicia sesión para ver tus citas.')
+          const Text('Por favor Inicia sesión para ver tus citas.')
         else
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
