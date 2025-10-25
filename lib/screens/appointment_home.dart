@@ -8,8 +8,9 @@ import 'LoginPage.dart';
 import 'package:app/routes.dart'; // si no usas rutas, puedes quitar este import
 import 'package:app/screens/messages.dart';
 import 'Settings.dart';
-import 'package:app/screens/APPOINTMENTS.DART'; // MyAppointmentsPage
+import 'package:app/screens/MYAPPOINTMENTS.DART'; // MyAppointmentsPage
 import 'create_appointment_dialog.dart'; 
+
 
 class _MyScrollBehavior extends MaterialScrollBehavior {
   @override

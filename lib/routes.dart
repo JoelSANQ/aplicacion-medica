@@ -1,4 +1,4 @@
-import 'package:app/screens/APPOINTMENTS.DART';
+import 'package:app/screens/MYAPPOINTMENTS.DART';
 import 'package:flutter/material.dart';
 import 'screens/appointment_home.dart';
 import 'screens/ProfilePage.dart';
