@@ -16,6 +16,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController nombreCtrl = TextEditingController();
   final TextEditingController telefonoCtrl = TextEditingController();
   final TextEditingController enfermedadesCtrl = TextEditingController();
+   final TextEditingController rolCtrl = TextEditingController();
 
   bool _loading = true;
   bool _saving = false;
@@ -47,6 +48,7 @@ class _ProfilePageState extends State<ProfilePage> {
         nombreCtrl.text = (data['nombre'] ?? '').toString();
         telefonoCtrl.text = (data['telefono'] ?? '').toString();
         enfermedadesCtrl.text = (data['enfermedades'] ?? '').toString();
+        rolCtrl.text = (data['rol'] ?? '').toString();
       }
     } catch (e) {
       if (mounted) {
@@ -70,6 +72,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final nombre = nombreCtrl.text.trim();
     final telefono = telefonoCtrl.text.trim();
     final enfermedades = enfermedadesCtrl.text.trim();
+    final rol = rolCtrl.text.trim();
 
     if (nombre.isEmpty && telefono.isEmpty && enfermedades.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,6 +92,7 @@ class _ProfilePageState extends State<ProfilePage> {
         'nombre': nombre,
         'telefono': telefono,
         'enfermedades': enfermedades,
+        'rol': rol,
         'actualizadoEn': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true)); // <-- ACTUALIZA, NO DUPLICA
 
@@ -213,6 +217,16 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: 12),
 
+            TextField(
+            controller: rolCtrl,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Rol (Paciente / Médico)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -255,7 +269,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Text(
                   'Nombre: ${data['nombre'] ?? ''}\n'
                   'Teléfono: ${data['telefono'] ?? ''}\n'
-                  'Enfermedades: ${data['enfermedades'] ?? ''}',
+                  'Enfermedades: ${data['enfermedades'] ?? ''},\n'
+                  'Rol: ${data['rol'] ?? ''}',
                   style: const TextStyle(height: 1.4),
                   
                 ),

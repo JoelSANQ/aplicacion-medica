@@ -1,4 +1,4 @@
-// lib/screens/create_appointment_dialog.dart
+// lib/screens/create_appointment_dialog.dart 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,8 +11,8 @@ String _dispDocId(String medicoId, DateTime inicio) {
 }
 
 // Config jornada para bloques (08:00-20:00).
-const int _inicioJornada = 8;   // 08:00
-const int _finJornada   = 20;   // 20:00 (exclusivo)
+const int _inicioJornada = 8; // 08:00
+const int _finJornada = 20;   // 20:00 (exclusivo)
 
 List<DateTime> _generarBloques(DateTime dia) {
   final base = DateTime(dia.year, dia.month, dia.day);
@@ -20,7 +20,7 @@ List<DateTime> _generarBloques(DateTime dia) {
 }
 
 String _fmtFecha(DateTime d) => DateFormat('dd/MM/yyyy').format(d);
-String _fmtHora(DateTime d)  => DateFormat('HH:mm').format(d);
+String _fmtHora(DateTime d) => DateFormat('HH:mm').format(d);
 
 /// Dialog para crear cita con selección de bloque (reserva disponibilidad)
 Future<void> showCreateAppointmentDialog(
@@ -28,6 +28,7 @@ Future<void> showCreateAppointmentDialog(
   String? motivoSugerido,
   String? lugarSugerido,
   String? medicoIdSugerido,
+  String? medicoNombreSugerido, // 👈 NUEVO
 }) async {
   final uid = FirebaseAuth.instance.currentUser?.uid;
   if (uid == null) {
@@ -40,23 +41,37 @@ Future<void> showCreateAppointmentDialog(
   }
 
   final tituloCtrl = TextEditingController(text: motivoSugerido ?? '');
-  final lugarCtrl  = TextEditingController(text: lugarSugerido ?? '');
+  final lugarCtrl = TextEditingController(text: lugarSugerido ?? '');
 
-  DateTime? fecha;             // solo fecha
+  DateTime? fecha; // solo fecha
   String? selMedicoId = medicoIdSugerido;
 
   DateTime? selectedSlotStart; // bloque elegido (inicio)
-  DateTime? selectedSlotEnd;   // bloque fin (inicio + 1h)
+  DateTime? selectedSlotEnd; // bloque fin (inicio + 1h)
 
-  const medicos = <Map<String, String>>[
-    {'id': 'dr_lopez',     'nombre': 'Dr. López'},
+  // 🔹 YA NO ES const, para poder agregar el médico dinámico
+  final List<Map<String, String>> medicos = [
+    {'id': 'dr_lopez', 'nombre': 'Dr. López'},
     {'id': 'dra_martinez', 'nombre': 'Dra. Martínez'},
-    {'id': 'dr_ramirez',   'nombre': 'Dr. Ramírez'},
-    {'id': 'dra_gomez',    'nombre': 'Dra. Gómez'},
-    {'id': 'dr_perez',     'nombre': 'Dr. Pérez'},
-    {'id': 'dra_ruiz',     'nombre': 'Dra. Ruiz'},
-    {'id': 'dr_castro',    'nombre': 'Dr. Castro'},
+    {'id': 'dr_ramirez', 'nombre': 'Dr. Ramírez'},
+    {'id': 'dra_gomez', 'nombre': 'Dra. Gómez'},
+    {'id': 'dr_perez', 'nombre': 'Dr. Pérez'},
+    {'id': 'dra_ruiz', 'nombre': 'Dra. Ruiz'},
+    {'id': 'dr_castro', 'nombre': 'Dr. Castro'},
+    {'id': 'dr_joel', 'nombre': 'Dr. Joel'},
   ];
+
+  // 🔹 Si viene un médico desde Firestore (uid) que no está en la lista,
+  // lo agregamos al inicio para que salga en el combo y quede seleccionado.
+  if (medicoIdSugerido != null && medicoIdSugerido.isNotEmpty) {
+    final yaExiste = medicos.any((m) => m['id'] == medicoIdSugerido);
+    if (!yaExiste) {
+      medicos.insert(0, {
+        'id': medicoIdSugerido,
+        'nombre': medicoNombreSugerido ?? 'Médico',
+      });
+    }
+  }
 
   await showDialog<bool>(
     context: context,
@@ -78,10 +93,13 @@ Future<void> showCreateAppointmentDialog(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   child: StatefulBuilder(
                     builder: (innerCtx, setSheet) {
-                      final fechaTxt = (fecha == null) ? 'Elegir fecha' : _fmtFecha(fecha!);
+                      final fechaTxt =
+                          (fecha == null) ? 'Elegir fecha' : _fmtFecha(fecha!);
 
                       Widget _buildBloques() {
-                        if (selMedicoId == null || fecha == null) return const SizedBox.shrink();
+                        if (selMedicoId == null || fecha == null) {
+                          return const SizedBox.shrink();
+                        }
                         final dia = _day(fecha!);
                         final bloques = _generarBloques(dia);
 
@@ -95,10 +113,13 @@ Future<void> showCreateAppointmentDialog(
                             final Map<DateTime, bool> estado = {};
                             if (snap.hasData) {
                               for (final d in snap.data!.docs) {
-                                final data = d.data() as Map<String, dynamic>;
-                                final tsIni = data['horaInicio'] as Timestamp?;
+                                final data =
+                                    d.data() as Map<String, dynamic>;
+                                final tsIni =
+                                    data['horaInicio'] as Timestamp?;
                                 if (tsIni == null) continue;
-                                estado[tsIni.toDate()] = (data['esta_disponible'] ?? true) as bool;
+                                estado[tsIni.toDate()] =
+                                    (data['esta_disponible'] ?? true) as bool;
                               }
                             }
 
@@ -106,42 +127,60 @@ Future<void> showCreateAppointmentDialog(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const SizedBox(height: 10),
-                                const Text('Horario de inicio',
-                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                const Text(
+                                  'Horario de inicio',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
                                 const SizedBox(height: 6),
                                 Wrap(
                                   spacing: 8,
                                   runSpacing: 8,
                                   children: bloques.map((inicio) {
-                                    final disponible = estado[inicio] ?? true;
-                                    final fin = inicio.add(const Duration(hours: 1));
-                                    final etiqueta = '${_fmtHora(inicio)} - ${_fmtHora(fin)}';
-                                    final isSelected = selectedSlotStart == inicio;
+                                    final disponible =
+                                        estado[inicio] ?? true;
+                                    final fin = inicio.add(
+                                        const Duration(hours: 1));
+                                    final etiqueta =
+                                        '${_fmtHora(inicio)} - ${_fmtHora(fin)}';
+                                    final isSelected =
+                                        selectedSlotStart == inicio;
 
                                     return ChoiceChip(
                                       label: Text(etiqueta),
                                       avatar: Icon(
-                                        disponible ? Icons.check_circle : Icons.lock_clock,
+                                        disponible
+                                            ? Icons.check_circle
+                                            : Icons.lock_clock,
                                         size: 18,
-                                        color: disponible ? Colors.green : Colors.red,
+                                        color: disponible
+                                            ? Colors.green
+                                            : Colors.red,
                                       ),
                                       selected: isSelected,
                                       onSelected: (sel) {
                                         if (!disponible) return;
                                         setSheet(() {
-                                          selectedSlotStart = sel ? inicio : null;
-                                          selectedSlotEnd = sel ? fin : null;
+                                          selectedSlotStart =
+                                              sel ? inicio : null;
+                                          selectedSlotEnd =
+                                              sel ? fin : null;
                                         });
                                       },
                                       selectedColor: Colors.green.shade100,
-                                      backgroundColor:
-                                          disponible ? Colors.green.shade50 : Colors.red.shade50,
+                                      backgroundColor: disponible
+                                          ? Colors.green.shade50
+                                          : Colors.red.shade50,
                                     );
                                   }).toList(),
                                 ),
                                 const SizedBox(height: 8),
-                                const Text('Seleccione el bloque disponible del médico',
-                                    style: TextStyle(color: Colors.black54)),
+                                const Text(
+                                  'Seleccione el bloque disponible del médico',
+                                  style: TextStyle(color: Colors.black54),
+                                ),
                               ],
                             );
                           },
@@ -152,16 +191,24 @@ Future<void> showCreateAppointmentDialog(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            height: 4, width: 48,
-                            margin: const EdgeInsets.only(bottom: 12, top: 4),
+                            height: 4,
+                            width: 48,
+                            margin:
+                                const EdgeInsets.only(bottom: 12, top: 4),
                             decoration: BoxDecoration(
-                              color: Colors.black12, borderRadius: BorderRadius.circular(2),
+                              color: Colors.black12,
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                           const Align(
                             alignment: Alignment.centerLeft,
-                            child: Text('Crear cita',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            child: Text(
+                              'Crear cita',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 12),
 
@@ -185,13 +232,19 @@ Future<void> showCreateAppointmentDialog(
                                     ),
                                   ),
                                   const SizedBox(height: 10),
+
+                                  // 🔹 Dropdown de médicos (incluye el dinámico)
                                   DropdownButtonFormField<String>(
                                     value: selMedicoId,
                                     items: medicos
-                                        .map((m) => DropdownMenuItem(
-                                              value: m['id'],
-                                              child: Text('${m['nombre']}  (${m['id']})'),
-                                            ))
+                                        .map(
+                                          (m) => DropdownMenuItem(
+                                            value: m['id'],
+                                            // 👇 solo el nombre, sin (dr_lopez)
+                                            child:
+                                                Text(m['nombre'] ?? ''),
+                                          ),
+                                        )
                                         .toList(),
                                     onChanged: (v) {
                                       setSheet(() {
@@ -206,17 +259,23 @@ Future<void> showCreateAppointmentDialog(
                                     ),
                                   ),
                                   const SizedBox(height: 10),
+
                                   Row(
                                     children: [
                                       Expanded(
                                         child: OutlinedButton.icon(
                                           onPressed: () async {
                                             final now = DateTime.now();
-                                            final picked = await showDatePicker(
+                                            final picked =
+                                                await showDatePicker(
                                               context: innerCtx,
-                                              initialDate: fecha ?? now,
+                                              initialDate:
+                                                  fecha ?? now,
                                               firstDate: _day(now),
-                                              lastDate: _day(now.add(const Duration(days: 365 * 2))),
+                                              lastDate: _day(
+                                                now.add(const Duration(
+                                                    days: 365 * 2)),
+                                              ),
                                             );
                                             if (picked != null) {
                                               setSheet(() {
@@ -226,12 +285,14 @@ Future<void> showCreateAppointmentDialog(
                                               });
                                             }
                                           },
-                                          icon: const Icon(Icons.calendar_today),
+                                          icon: const Icon(
+                                              Icons.calendar_today),
                                           label: Text(fechaTxt),
                                         ),
                                       ),
                                     ],
                                   ),
+
                                   _buildBloques(),
                                 ],
                               ),
@@ -246,24 +307,30 @@ Future<void> showCreateAppointmentDialog(
                                   icon: const Icon(Icons.close),
                                   label: const Text('Cancelar'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.grey.shade200,
+                                    backgroundColor:
+                                        Colors.grey.shade200,
                                     foregroundColor: Colors.black87,
                                   ),
-                                  onPressed: () => Navigator.of(dialogCtx).pop(false),
+                                  onPressed: () =>
+                                      Navigator.of(dialogCtx).pop(false),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  icon: const Icon(Icons.save_outlined),
+                                  icon:
+                                      const Icon(Icons.save_outlined),
                                   label: const Text('Guardar cita'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF7E57C2),
+                                    backgroundColor:
+                                        const Color(0xFF7E57C2),
                                     foregroundColor: Colors.white,
                                   ),
                                   onPressed: () async {
-                                    final motivo = tituloCtrl.text.trim();
-                                    final lugar  = lugarCtrl.text.trim();
+                                    final motivo =
+                                        tituloCtrl.text.trim();
+                                    final lugar =
+                                        lugarCtrl.text.trim();
 
                                     if (motivo.isEmpty ||
                                         lugar.isEmpty ||
@@ -272,35 +339,52 @@ Future<void> showCreateAppointmentDialog(
                                         selectedSlotStart == null ||
                                         selectedSlotEnd == null) {
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           const SnackBar(
-                                            content: Text('Completa motivo, lugar, médico, fecha y bloque.'),
+                                            content: Text(
+                                              'Completa motivo, lugar, médico, fecha y bloque.',
+                                            ),
                                           ),
                                         );
                                       }
                                       return;
                                     }
 
-                                    final inicio = selectedSlotStart!;
-                                    final fin    = selectedSlotEnd!;
+                                    final inicio =
+                                        selectedSlotStart!;
+                                    final fin = selectedSlotEnd!;
                                     final soloDia = _day(inicio);
 
-                                    final String dispId = _dispDocId(selMedicoId!, inicio);
-                                    final dispRef = FirebaseFirestore.instance
-                                        .collection('disponibilidad_medicos')
-                                        .doc(dispId);
+                                    final String dispId =
+                                        _dispDocId(selMedicoId!, inicio);
+                                    final dispRef =
+                                        FirebaseFirestore
+                                            .instance
+                                            .collection(
+                                                'disponibilidad_medicos')
+                                            .doc(dispId);
 
                                     try {
                                       // Verificar que el bloque siga libre
-                                      final existing = await dispRef.get();
+                                      final existing =
+                                          await dispRef.get();
                                       if (existing.exists) {
-                                        final data = existing.data() as Map<String, dynamic>;
-                                        final ocupado = (data['esta_disponible'] ?? false) == false;
+                                        final data = existing.data()
+                                            as Map<String, dynamic>;
+                                        final ocupado =
+                                            (data['esta_disponible'] ??
+                                                    false) ==
+                                                false;
                                         if (ocupado) {
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(
+                                                    context)
+                                                .showSnackBar(
                                               const SnackBar(
-                                                content: Text('Ese horario ya está ocupado.'),
+                                                content: Text(
+                                                  'Ese horario ya está ocupado.',
+                                                ),
                                               ),
                                             );
                                           }
@@ -309,18 +393,26 @@ Future<void> showCreateAppointmentDialog(
                                       }
 
                                       // ----- ID COMPARTIDO -----
-                                      final userApptRef = FirebaseFirestore.instance
-                                          .collection('usuarios')
-                                          .doc(uid)
-                                          .collection('citas')
-                                          .doc(); // genera id
+                                      final userApptRef =
+                                          FirebaseFirestore
+                                              .instance
+                                              .collection('usuarios')
+                                              .doc(uid)
+                                              .collection('citas')
+                                              .doc(); // genera id
 
-                                      final String apptId = userApptRef.id;
-                                      final globalApptRef = FirebaseFirestore.instance
-                                          .collection('citas')
-                                          .doc(apptId);
+                                      final String apptId =
+                                          userApptRef.id;
+                                      final globalApptRef =
+                                          FirebaseFirestore
+                                              .instance
+                                              .collection('citas')
+                                              .doc(apptId);
 
-                                      final batch = FirebaseFirestore.instance.batch();
+                                      final batch =
+                                          FirebaseFirestore
+                                              .instance
+                                              .batch();
 
                                       final payload = {
                                         'id': apptId,
@@ -329,9 +421,12 @@ Future<void> showCreateAppointmentDialog(
                                         'motivo': motivo,
                                         'titulo': motivo,
                                         'lugar': lugar,
-                                        'cuando': Timestamp.fromDate(inicio),
-                                        'cuandoFin': Timestamp.fromDate(fin),
-                                        'creadoEn': FieldValue.serverTimestamp(),
+                                        'cuando':
+                                            Timestamp.fromDate(inicio),
+                                        'cuandoFin':
+                                            Timestamp.fromDate(fin),
+                                        'creadoEn': FieldValue
+                                            .serverTimestamp(),
                                       };
 
                                       batch.set(userApptRef, payload);
@@ -342,9 +437,14 @@ Future<void> showCreateAppointmentDialog(
                                         dispRef,
                                         {
                                           'medicoId': selMedicoId,
-                                          'fecha': Timestamp.fromDate(soloDia),
-                                          'horaInicio': Timestamp.fromDate(inicio),
-                                          'horaFin': Timestamp.fromDate(fin),
+                                          'fecha': Timestamp.fromDate(
+                                              soloDia),
+                                          'horaInicio':
+                                              Timestamp.fromDate(
+                                                  inicio),
+                                          'horaFin':
+                                              Timestamp.fromDate(
+                                                  fin),
                                           'esta_disponible': false,
                                         },
                                         SetOptions(merge: true),
@@ -354,14 +454,22 @@ Future<void> showCreateAppointmentDialog(
 
                                       if (context.mounted) {
                                         Navigator.of(dialogCtx).pop(true);
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Cita creada ✅ (bloque reservado)')),
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Cita creada ✅ (bloque reservado)',
+                                            ),
+                                          ),
                                         );
                                       }
                                     } catch (e) {
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error: $e')),
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text('Error: $e'),
+                                          ),
                                         );
                                       }
                                     }

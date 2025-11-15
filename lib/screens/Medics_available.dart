@@ -19,6 +19,7 @@ class _DoctorAvailabilitySectionState extends State<DoctorAvailabilitySection> {
     {'id': 'dr_perez', 'nombre': 'Dr. Pérez'},
     {'id': 'dra_ruiz', 'nombre': 'Dra. Ruiz'},
     {'id': 'dr_castro', 'nombre': 'Dr. Castro'},
+    {'id': 'dr_joel', 'nombre': 'Dr. Joel'},
   ];
 
   String? _medicoSeleccionado;

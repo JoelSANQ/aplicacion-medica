@@ -262,7 +262,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.end,/*  */
                         children: [
                           Text('Eliminar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           SizedBox(width: 8),
