@@ -34,6 +34,15 @@ class AppointmentHomePage extends StatefulWidget {
 class _AppointmentHomePageState extends State<AppointmentHomePage> {
   int _navIndex = 0; // 0=Inicio, 1=Mensajes, 2=?, 3=?
 
+  // paleta verdosa
+  static const Color kBgMint = Color(0xFFE8F5E9);
+  static const Color kCardMintStart = Color(0xFFB2DFDB);
+  static const Color kCardMintEnd = Color(0xFFE0F2F1);
+  static const Color kButtonTeal = Color(0xFF0F766E);
+  static const Color kButtonTealLight = Color(0xFF14B8A6);
+  static const Color kSpecialistStart = Color(0xFFE0F2F1);
+  static const Color kSpecialistEnd = Color(0xFFC8E6C9);
+
   // rol actual del usuario
   String? _role; // 'Paciente' o 'Medico'
   bool _loadingRole = true;
@@ -56,7 +65,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
           child: Ink(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFE3F2FD), Color(0xFFC8E6C9)],
+                colors: [kSpecialistStart, kSpecialistEnd],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -101,6 +110,35 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
         (route) => false,
       );
     }
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Cerrar sesión'),
+        content: const Text(
+          '¿Seguro que deseas cerrar tu sesión en DoctorAppointmentApp?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _logoutToLogin(context);
+            },
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -177,7 +215,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
             child: Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFE3F2FD), Color.fromARGB(255, 219, 248, 248)],
+                  colors: [kCardMintStart, kCardMintEnd],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -189,7 +227,11 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  const CircleAvatar(radius: 28, child: Icon(Icons.person, size: 28)),
+                  const CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.person, size: 28, color: kButtonTeal),
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: StreamBuilder<DocumentSnapshot>(
@@ -208,11 +250,17 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                           children: [
                             Text(
                               'Bienvenido ${nombre.isNotEmpty ? nombre : ''}',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF064E3B),
+                              ),
                             ),
                             const SizedBox(height: 2),
-                            const Text('¿En qué podemos ayudarte hoy?',
-                                style: TextStyle(fontSize: 14, color: Colors.black87)),
+                            const Text(
+                              '¿En qué podemos ayudarte hoy?',
+                              style: TextStyle(fontSize: 14, color: Colors.black87),
+                            ),
                             const SizedBox(height: 4),
                             Text(
                               email,
@@ -242,9 +290,13 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                 child: ElevatedButton.icon(
                   onPressed: () => showCreateAppointmentDialog(context),
                   icon: const Icon(Icons.add_circle_outline),
-                  label: const Text('Crear cita',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    'Crear cita',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: kButtonTealLight ,
+                    foregroundColor: Colors.white,
                     elevation: 6,
                     shadowColor: Colors.black45,
                     shape: RoundedRectangleBorder(
@@ -258,9 +310,13 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                 child: ElevatedButton.icon(
                   onPressed: () => setState(() => _navIndex = 2), // tab 2 -> Mis citas
                   icon: const Icon(Icons.calendar_month),
-                  label: const Text('Mis citas',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    'Mis citas',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: kButtonTealLight,
+                    foregroundColor: Colors.white,
                     elevation: 6,
                     shadowColor: Colors.black45,
                     shape: RoundedRectangleBorder(
@@ -284,6 +340,8 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
+                  backgroundColor: kButtonTeal,
+                  foregroundColor: Colors.white,
                   elevation: 6,
                   shadowColor: Colors.black45,
                   shape: RoundedRectangleBorder(
@@ -305,9 +363,13 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
             child: ElevatedButton.icon(
               onPressed: () => Navigator.pushNamed(context, AppRoutes.consejos),
               icon: const Icon(Icons.lightbulb_outline, size: 20),
-              label: const Text('Consejos de salud',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              label: const Text(
+                'Consejos de salud',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
               style: ElevatedButton.styleFrom(
+                backgroundColor: kButtonTealLight,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 elevation: 2,
                 shape: RoundedRectangleBorder(
@@ -549,12 +611,14 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                   final hora = dt == null ? '—' : DateFormat('hh:mm a').format(dt);
 
                   return Card(
+                    color: const Color(0xFFF1FAF5),
                     elevation: 2,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: ListTile(
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      leading: const Icon(Icons.medical_services_outlined),
+                      leading: const Icon(Icons.medical_services_outlined,
+                          color: kButtonTeal),
                       title: Text(titulo),
                       subtitle: Text('$fecha  •  $hora  •  $lugar'),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 18),
@@ -566,23 +630,24 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
             },
           ),
 
-        const SizedBox(height: 12),
-        ElevatedButton.icon(
-          onPressed: () => _logoutToLogin(context),
-          icon: const Icon(Icons.logout, color: Colors.white),
-          label: const Text(
-            'Cerrar sesión',
-            style: TextStyle(color: Colors.white),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.zero,
+        const SizedBox(height: 8),
+
+        // botón pequeño que abre pop-up de cierre de sesión
+        Center(
+          child: TextButton.icon(
+            onPressed: () => _showLogoutDialog(context),
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            label: const Text(
+              'Cerrar sesión',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            minimumSize: const Size(double.infinity, 48),
           ),
         ),
+
+        const SizedBox(height: 12),
       ],
     );
 
@@ -622,7 +687,13 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
         : (currentIndex == 2 || currentIndex == 3); // Paciente: Mis citas y Ajustes
 
     return Scaffold(
-      appBar: hideAppBar ? null : AppBar(title: const Text('Citas Médicas')),
+      backgroundColor: kBgMint,
+      appBar: hideAppBar
+          ? null
+          : AppBar(
+              title: const Text('Citas Médicas'),
+              backgroundColor: kButtonTeal,
+            ),
       body: currentBody,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
