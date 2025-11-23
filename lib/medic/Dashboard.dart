@@ -1,512 +1,451 @@
 // lib/medic/Dashboard.dart
+
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
+import 'dates_graph.dart';
 
-class DashboardPage extends StatelessWidget {
+// NUEVO IMPORT
+import 'enfermedades_pie_chart_page.dart';
+
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final currentUser = FirebaseAuth.instance.currentUser;
+  State<DashboardPage> createState() => _DashboardPageState();
+}
 
-    if (currentUser == null) {
-      return const Center(
-        child: Text('Inicia sesión como médico para ver el dashboard.'),
-      );
+class _DashboardPageState extends State<DashboardPage> {
+  final _auth = FirebaseAuth.instance;
+  final _db = FirebaseFirestore.instance;
+
+  bool _loadingMedicoIds = true;
+  late Set<String> _medicoIds;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAcceptedMedicoIds();
+  }
+
+  Future<void> _loadAcceptedMedicoIds() async {
+    final user = _auth.currentUser;
+    final ids = <String>{};
+
+    if (user != null) {
+      ids.add(user.uid);
+
+      try {
+        final doc = await _db.collection('usuarios').doc(user.uid).get();
+        final data = doc.data();
+        final possible =
+            (data?['medicoId'] ?? data?['id_medico'] ?? data?['alias'])
+                ?.toString();
+        if (possible != null && possible.trim().isNotEmpty) {
+          ids.add(possible.trim());
+        }
+
+        final nombre = (data?['nombre'] ?? '').toString().toLowerCase();
+        if (nombre.contains('joel')) {
+          ids.add('dr_joel');
+        }
+      } catch (_) {}
     }
 
-    // Leemos el documento del médico para obtener su "medicoId"
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(currentUser.uid)
-          .get(),
-      builder: (context, snapUser) {
-        if (snapUser.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+    if (ids.isEmpty) ids.add('dr_joel');
+
+    setState(() {
+      _medicoIds = ids;
+      _loadingMedicoIds = false;
+    });
+  }
+
+  String _fmtFechaHora(DateTime d) {
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final yyyy = d.year.toString();
+    final hh = d.hour.toString().padLeft(2, '0');
+    final min = d.minute.toString().padLeft(2, '0');
+    return '$dd/$mm/$yyyy  $hh:$min';
+  }
+
+  String _fmtSoloFecha(DateTime d) {
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final yyyy = d.year.toString();
+    return '$dd/$mm/$yyyy';
+  }
+
+  List<_Appt> _mapDocsToAppointments(List<QueryDocumentSnapshot> docs) {
+    final list = <_Appt>[];
+    for (final d in docs) {
+      final m = d.data() as Map<String, dynamic>;
+      final ts = m['cuando'] as Timestamp?;
+      final dt = ts?.toDate();
+      if (dt == null) continue;
+
+      list.add(_Appt(
+        id: d.id,
+        cuando: dt,
+        cuandoFin: (m['cuandoFin'] as Timestamp?)?.toDate(),
+        medicoId: (m['medicoId'] ?? '').toString(),
+        pacienteId: (m['pacienteId'] ?? '').toString(),
+        motivo: (m['motivo'] ?? m['titulo'] ?? '—').toString(),
+        titulo: (m['titulo'] ?? m['motivo'] ?? 'Cita médica').toString(),
+        lugar: (m['lugar'] ?? '—').toString(),
+      ));
+    }
+    return list;
+  }
+
+  Future<Map<String, String>> _fetchPatientNames(Set<String> ids) async {
+    final out = <String, String>{};
+    if (ids.isEmpty) return out;
+
+    final list = ids.toList();
+    for (int i = 0; i < list.length; i += 10) {
+      final chunk = list.sublist(i, min(i + 10, list.length));
+      try {
+        final q = await _db
+            .collection('usuarios')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+
+        for (final doc in q.docs) {
+          final data = doc.data();
+          final nombre =
+              (data['nombre'] ?? data['name'] ?? 'Paciente').toString();
+          out[doc.id] = nombre;
         }
+      } catch (_) {}
+    }
+    return out;
+  }
 
-        String? medicoKey;
-        if (snapUser.hasData && snapUser.data!.exists) {
-          final data = snapUser.data!.data() as Map<String, dynamic>?;
-          medicoKey = data?['medicoId']?.toString() ??
-              data?['codigoMedico']?.toString() ??
-              data?['idMedico']?.toString();
-        }
-
-        // 🔁 Fallback para tu caso actual (Dr. Joel)
-        medicoKey ??= 'dr_joel';
-
-        return _DashboardContent(medicoKey: medicoKey!);
+  // ================================================================
+  //  BOTTOM SHEET PARA GRÁFICA DE ENFERMEDADES (PASTEL)
+  // ================================================================
+  void _showEnfermedadesPie(BuildContext context, Map<String, int> freq) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (_) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.80,
+          child: EnfermedadesPieChartPage(enfermedadesCount: freq),
+        );
       },
     );
   }
-}
 
-class _DashboardContent extends StatelessWidget {
-  final String medicoKey;
-  const _DashboardContent({required this.medicoKey});
-
-  String _fmtFecha(DateTime d) => DateFormat('dd/MM/yyyy').format(d);
-  String _fmtHora(DateTime d) => DateFormat('HH:mm').format(d);
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ===== TÍTULO =====
-              Text(
-                'Dashboard de citas',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Resumen en tiempo real de tus citas médicas.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-
-              // ===== STATS Y MIS CITAS (solo del médico actual) =====
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('citas')
-                    .where('medicoId', isEqualTo: medicoKey)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text('Error: ${snapshot.error}'),
-                    );
-                  }
-                  if (!snapshot.hasData) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  final docs = snapshot.data!.docs;
-                  final totalCitas = docs.length;
-
-                  int citasProximas = 0;
-                  final pacientesAtendidosSet = <String>{};
-                  final motivosCounter = <String, int>{};
-                  final List<QueryDocumentSnapshot> proximas = [];
-
-                  for (final d in docs) {
-                    final data = d.data() as Map<String, dynamic>;
-
-                    final ts = data['cuando'] as Timestamp?;
-                    final fecha = ts?.toDate();
-
-                    final pacienteId = data['pacienteId']?.toString();
-                    if (pacienteId != null && pacienteId.isNotEmpty) {
-                      pacientesAtendidosSet.add(pacienteId);
-                    }
-
-                    final motivo =
-                        (data['motivo'] ?? data['titulo'] ?? '').toString().trim();
-                    if (motivo.isNotEmpty) {
-                      motivosCounter[motivo] =
-                          (motivosCounter[motivo] ?? 0) + 1;
-                    }
-
-                    if (fecha != null && fecha.isAfter(now)) {
-                      citasProximas++;
-                      proximas.add(d);
-                    }
-                  }
-
-                  proximas.sort((a, b) {
-                    final da =
-                        (a['cuando'] as Timestamp?)?.toDate() ?? DateTime(1900);
-                    final db =
-                        (b['cuando'] as Timestamp?)?.toDate() ?? DateTime(1900);
-                    return da.compareTo(db);
-                  });
-
-                  final pacientesAtendidos = pacientesAtendidosSet.length;
-
-                  String enfermedadTop = '—';
-                  int enfermedadTopCount = 0;
-                  motivosCounter.forEach((motivo, count) {
-                    if (count > enfermedadTopCount) {
-                      enfermedadTop = motivo;
-                      enfermedadTopCount = count;
-                    }
-                  });
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // === FILA DE 3 CARDS (STATS) ===
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _DashboardCard(
-                              title: 'Citas creadas',
-                              value: '$totalCitas',
-                              subtitle: 'Total registradas',
-                              icon: Icons.event_note,
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF1976D2), Color(0xFF42A5F5)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _DashboardCard(
-                              title: 'Citas próximas',
-                              value: '$citasProximas',
-                              subtitle: 'Pendientes por atender',
-                              icon: Icons.schedule,
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF43A047), Color(0xFF81C784)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _DashboardCard(
-                              title: 'Pacientes atendidos',
-                              value: '$pacientesAtendidos',
-                              subtitle: 'Con al menos 1 cita',
-                              icon: Icons.group,
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFFFA726), Color(0xFFFFCC80)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // === CARD ENFERMEDAD MÁS RECURRENTE ===
-                      _DashboardCard(
-                        title: 'Enfermedad más recurrente',
-                        value: enfermedadTop,
-                        subtitle: enfermedadTopCount > 0
-                            ? 'Total de casos: $enfermedadTopCount'
-                            : 'Aún no hay suficientes datos',
-                        icon: Icons.local_hospital,
-                        height: 110,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF8E24AA), Color(0xFFCE93D8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // ========= MIS CITAS (LISTA DETALLADA) =========
-                      Text(
-                        'Mis citas',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-
-                      if (docs.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Text('No tienes citas registradas como médico.'),
-                        )
-                      else
-                        Column(
-                          children: docs.map((doc) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            final motivo =
-                                (data['titulo'] ?? data['motivo'] ?? 'Cita')
-                                    .toString();
-                            final lugar =
-                                (data['lugar'] ?? '—').toString();
-                            final ts = data['cuando'] as Timestamp?;
-                            final fecha = ts?.toDate();
-                            DateTime? fin;
-                            if (data['cuandoFin'] is Timestamp) {
-                              fin = (data['cuandoFin'] as Timestamp).toDate();
-                            } else if (fecha != null) {
-                              fin = fecha.add(const Duration(hours: 1));
-                            }
-
-                            final fechaTxt =
-                                fecha == null ? '—' : _fmtFecha(fecha);
-                            final horaInicioTxt =
-                                fecha == null ? '—' : _fmtHora(fecha);
-                            final horaFinTxt =
-                                fin == null ? '—' : _fmtHora(fin);
-
-                            final pacienteId =
-                                (data['pacienteId'] ?? '').toString();
-
-                            // Helper local para construir la card
-                            Widget buildTile(String pacienteNombre) {
-                              return Card(
-                                margin:
-                                    const EdgeInsets.symmetric(vertical: 6),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: ListTile(
-                                  leading: const Icon(
-                                    Icons.event_available,
-                                    color: Color(0xFF1976D2),
-                                  ),
-                                  title: Text(
-                                    motivo,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Text(
-                                    '$fechaTxt · $horaInicioTxt - $horaFinTxt\n'
-                                    'Paciente: $pacienteNombre · Lugar: $lugar',
-                                  ),
-                                  isThreeLine: true,
-                                ),
-                              );
-                            }
-
-                            // Si no hay pacienteId, mostramos texto genérico
-                            if (pacienteId.isEmpty) {
-                              return buildTile('Paciente sin ID');
-                            }
-
-                            // Buscamos el nombre del paciente en la colección "usuarios/{pacienteId}"
-                            return FutureBuilder<DocumentSnapshot>(
-                              future: FirebaseFirestore.instance
-                                  .collection('usuarios')
-                                  .doc(pacienteId)
-                                  .get(),
-                              builder: (ctx, snapPaciente) {
-                                if (snapPaciente.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return buildTile('Cargando...');
-                                }
-
-                                String nombrePaciente = pacienteId;
-                                if (snapPaciente.hasData &&
-                                    snapPaciente.data!.exists) {
-                                  final pData = snapPaciente.data!.data()
-                                      as Map<String, dynamic>?;
-                                  nombrePaciente =
-                                      (pData?['nombre'] ?? pacienteId)
-                                          .toString();
-                                }
-
-                                return buildTile(nombrePaciente);
-                              },
-                            );
-                          }).toList(),
-                        ),
-
-                      const SizedBox(height: 24),
-                    ],
-                  );
-                },
-              ),
-
-              // ===== PACIENTES REGISTRADOS (colección usuarios) =====
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('usuarios')
-                    .where('rol', isEqualTo: 'Paciente')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const SizedBox.shrink();
-                  }
-                  final totalPacientes = snapshot.data!.docs.length;
-
-                  return _DashboardWideCard(
-                    title: 'Pacientes registrados',
-                    value: '$totalPacientes',
-                    subtitle: 'En el sistema',
-                    icon: Icons.person,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFAB47BC), Color(0xFF7E57C2)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// ===== CARD PEQUEÑA (INDICADORES) =====
-class _DashboardCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String subtitle;
-  final IconData icon;
-  final LinearGradient gradient;
-  final double height;
-
-  const _DashboardCard({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.icon,
-    required this.gradient,
-    this.height = 140,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      margin: const EdgeInsets.symmetric(vertical: 6),
+  Widget _metricCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required Color color,
+    required IconData icon,
+    VoidCallback? onTap,
+  }) {
+    final card = Container(
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: gradient,
+        color: color,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
         ],
       ),
-      padding: const EdgeInsets.all(16),
-      child: DefaultTextStyle(
-        style: const TextStyle(color: Colors.white),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            ),
-            const Spacer(),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.white.withOpacity(.25),
+            child: Icon(icon, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    value,
+                Text(title,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(value,
                     style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.white24,
-                  child: Icon(icon, color: Colors.white),
-                ),
+                        color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
+                Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
+          )
+        ],
       ),
     );
+
+    if (onTap == null) return card;
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: card,
+    );
   }
-}
-
-/// ===== CARD ANCHA (PACIENTES REGISTRADOS) =====
-class _DashboardWideCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String subtitle;
-  final IconData icon;
-  final LinearGradient gradient;
-
-  const _DashboardWideCard({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.icon,
-    required this.gradient,
-  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8, bottom: 16),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: DefaultTextStyle(
-        style: const TextStyle(color: Colors.white),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.white24,
-              child: Icon(icon, color: Colors.white),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    if (_loadingMedicoIds) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final citasStream = _db.collection('citas').snapshots();
+
+    return Scaffold(
+      body: StreamBuilder<QuerySnapshot>(
+        stream: citasStream,
+        builder: (context, snap) {
+          if (snap.hasError) {
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const Text('Dashboard de citas',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Text('Error al cargar citas: ${snap.error}'),
+              ],
+            );
+          }
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final all = _mapDocsToAppointments(snap.data!.docs);
+          final appts = all.where((a) => _medicoIds.contains(a.medicoId)).toList();
+          appts.sort((a, b) => a.cuando.compareTo(b.cuando));
+
+          final now = DateTime.now();
+          final totalCitas = appts.length;
+          final proximas = appts.where((a) => a.cuando.isAfter(now)).toList();
+
+          final pacientesUnicos = appts
+              .map((a) => a.pacienteId)
+              .where((id) => id.trim().isNotEmpty)
+              .toSet();
+
+          // enfermedad top (motivo o titulo)
+          final freq = <String, int>{};
+          for (final a in appts) {
+            final key = a.motivo.trim().isEmpty ? a.titulo.trim() : a.motivo.trim();
+            if (key.isEmpty) continue;
+            freq[key] = (freq[key] ?? 0) + 1;
+          }
+          String topEnf = '—';
+          int topCount = 0;
+          freq.forEach((k, v) {
+            if (v > topCount) {
+              topCount = v;
+              topEnf = k;
+            }
+          });
+
+          final apptsForChart = appts;
+
+          return FutureBuilder<Map<String, String>>(
+            future: _fetchPatientNames(pacientesUnicos),
+            builder: (context, namesSnap) {
+              final names = namesSnap.data ?? {};
+
+              return ListView(
+                padding: const EdgeInsets.all(16),
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.bold),
+                  const Text(
+                    'Dashboard de citas',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 12),
+                  const Text(
+                    'Resumen en tiempo real de tus citas médicas.',
+                    style: TextStyle(color: Colors.black54),
                   ),
+                  const SizedBox(height: 14),
+
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1.25,
+                    children: [
+                      _metricCard(
+                        title: 'Citas creadas',
+                        value: '$totalCitas',
+                        subtitle: 'Total registradas',
+                        color: const Color(0xFF2196F3),
+                        icon: Icons.event_available,
+                        // TU GRÁFICA DE SEMANA ACTUAL (ya la tienes)
+                        onTap: () {
+                          final fechas = apptsForChart.map((a) => a.cuando).toList();
+                          final map = _buildWeekMap(fechas);
+
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            showDragHandle: true,
+                            backgroundColor: Colors.white,
+                            builder: (_) {
+                              return SizedBox(
+                                height: MediaQuery.of(context).size.height * 0.75,
+                                child: CitasPorSemanaChartPage(citasPorDia: map),
+                              );
+                            },
+                          );
+                        },
+                      ),
+
+                      _metricCard(
+                        title: 'Citas próximas',
+                        value: '${proximas.length}',
+                        subtitle: 'Pendientes por atender',
+                        color: const Color(0xFF4CAF50),
+                        icon: Icons.schedule,
+                      ),
+
+                      _metricCard(
+                        title: 'Pacientes atendidos',
+                        value: '${pacientesUnicos.length}',
+                        subtitle: 'Con al menos 1 cita',
+                        color: const Color(0xFFFF9800),
+                        icon: Icons.people_alt,
+                      ),
+
+                      _metricCard(
+                        title: 'Enfermedad top',
+                        value: '$topCount',
+                        subtitle: topEnf,
+                        color: const Color(0xFF9C27B0),
+                        icon: Icons.healing,
+                        // NUEVO: ABRE PIE CHART DESDE ABAJO
+                        onTap: () => _showEnfermedadesPie(context, freq),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  const Text(
+                    'Próximas citas',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (proximas.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: Text('No tienes citas próximas.')),
+                    )
+                  else
+                    Column(
+                      children: proximas.take(5).map((a) {
+                        final pacienteNombre = names[a.pacienteId] ?? a.pacienteId;
+
+                        return Card(
+                          elevation: 2,
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            leading: const Icon(Icons.medical_services_outlined),
+                            title: Text(a.titulo,
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Text(
+                              '${_fmtFechaHora(a.cuando)}  •  ${a.lugar}\nPaciente: $pacienteNombre',
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                  const SizedBox(height: 18),
+
+                  const Text(
+                    'Pacientes atendidos',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (pacientesUnicos.isEmpty)
+                    const Text('Aún no tienes pacientes registrados.')
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: pacientesUnicos.map((id) {
+                        final nombre = names[id] ?? id;
+                        return Chip(
+                          avatar: const Icon(Icons.person, size: 18),
+                          label: Text(nombre),
+                        );
+                      }).toList(),
+                    ),
+
+                  const SizedBox(height: 16),
                 ],
-              ),
-            ),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }
+
+  // ===== helper para semana actual (la que ya usas) =====
+  Map<String, int> _buildWeekMap(List<DateTime> fechas) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    String keyYMD(DateTime d) => "${d.year}-${two(d.month)}-${two(d.day)}";
+
+    DateTime startOfCurrentWeek(DateTime now) {
+      final n = DateTime(now.year, now.month, now.day);
+      return n.subtract(Duration(days: n.weekday - 1)); // lunes
+    }
+
+    final now = DateTime.now();
+    final start = startOfCurrentWeek(now);
+    final end = start.add(const Duration(days: 6));
+
+    final map = <String, int>{};
+    for (final f in fechas) {
+      final d = DateTime(f.year, f.month, f.day);
+      if (d.isBefore(start) || d.isAfter(end)) continue;
+      final k = keyYMD(d);
+      map[k] = (map[k] ?? 0) + 1;
+    }
+    return map;
+  }
+}
+
+// ===== modelo interno =====
+class _Appt {
+  final String id;
+  final DateTime cuando;
+  final DateTime? cuandoFin;
+  final String medicoId;
+  final String pacienteId;
+  final String motivo;
+  final String titulo;
+  final String lugar;
+
+  _Appt({
+    required this.id,
+    required this.cuando,
+    this.cuandoFin,
+    required this.medicoId,
+    required this.pacienteId,
+    required this.motivo,
+    required this.titulo,
+    required this.lugar,
+  });
 }

@@ -207,7 +207,7 @@ class SettingsPage extends StatelessWidget {
 
                           _SettingsItem(
                             icon: Icons.logout,
-                            title: 'Log Out',
+                            title: 'Cerrar sesion',
                             isDestructive: true,
                             onTap: () => _logout(context),
                           ),
