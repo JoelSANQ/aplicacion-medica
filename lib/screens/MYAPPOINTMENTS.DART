@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:app/theme/app_colors.dart';
 
 import 'edit_appointment_dialog.dart'; // <-- usamos este editor
 import 'Medics_available.dart';
@@ -69,7 +70,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
   }
 
   // ========= Detalle con botón Editar (abre showEditAppointmentDialog) =========
-  void _mostrarDetalleCita(DocumentSnapshot doc) {
+  void mostrarDetalleCita(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     final inicio = (data['cuando'] as Timestamp?)?.toDate();
     final fin = (data['cuandoFin'] as Timestamp?)?.toDate() ??
@@ -149,13 +150,11 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
   Widget build(BuildContext context) {
     if (_uid == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Mis citas')),
         body: const Center(child: Text('Inicia sesión para ver tus citas.')),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Mis citas')),
       body: ListView(
         children: [
           // ===== Filtro por rango =====
@@ -245,12 +244,11 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                   final horaInicio = inicio == null ? '—' : _fmtHora(inicio);
                   final horaFin = fin == null ? '—' : _fmtHora(fin!);
 
-                  // ====== SOLO AÑADIDO: Dismissible alrededor de la Card ======
+                  // ====== Dismissible alrededor de la tarjeta ======
                   return Dismissible(
                     key: ValueKey(d.id),
                     direction: DismissDirection.endToStart, // ← borrar
                     background: Container(
-                      // (background se muestra al arrastrar hacia la derecha; no lo usamos)
                       color: Colors.transparent,
                     ),
                     secondaryBackground: Container(
@@ -262,16 +260,21 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.end,/*  */
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Text('Eliminar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text(
+                            'Eliminar',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           SizedBox(width: 8),
                           Icon(Icons.delete, color: Colors.white),
                         ],
                       ),
                     ),
                     confirmDismiss: (direction) async {
-                      // mismo diálogo de confirmación que tu botón
                       final fechaTxt = inicio == null
                           ? '—'
                           : DateFormat('dd/MM/yyyy – HH:mm').format(inicio);
@@ -295,7 +298,6 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                       return ok == true && inicio != null;
                     },
                     onDismissed: (direction) async {
-                      // misma lógica que el botón de eliminar
                       if (inicio == null) return;
                       try {
                         // 1) Borrar la cita del usuario
@@ -331,10 +333,11 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                         if (snapGlobal.exists) {
                           await globalRef.delete();
                         } else {
-                          // Fallback para citas viejas creadas sin ID compartido
+                          // Fallback para citas viejas sin ID compartido
                           try {
                             final startTs = Timestamp.fromDate(inicio);
-                            final endTs = Timestamp.fromDate(inicio.add(const Duration(hours: 1)));
+                            final endTs =
+                                Timestamp.fromDate(inicio.add(const Duration(hours: 1)));
 
                             Query gq = FirebaseFirestore.instance
                                 .collection('citas')
@@ -352,7 +355,8 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                               gdocs = await FirebaseFirestore.instance
                                   .collection('citas')
                                   .where('pacienteId', isEqualTo: _uid)
-                                  .where('cuando', isEqualTo: Timestamp.fromDate(inicio))
+                                  .where('cuando',
+                                      isEqualTo: Timestamp.fromDate(inicio))
                                   .get();
                             }
 
@@ -364,7 +368,9 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
 
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Cita eliminada y bloque liberado.')),
+                            const SnackBar(
+                              content: Text('Cita eliminada y bloque liberado.'),
+                            ),
                           );
                         }
                       } catch (e) {
@@ -375,144 +381,214 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                         }
                       }
                     },
-                    // ====== FIN: Dismissible ======
 
-                    child: Card(
-                      elevation: 2,
+                    // ====== AQUÍ VA LA TARJETA CON GRADIENT ======
+                    child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ListTile(
-                        leading: const Icon(Icons.event_available),
-                        title: Text(titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        subtitle: Text('$fecha  •  $horaInicio - $horaFin  •  $lugar'),
-                        onTap: () => _mostrarDetalleCita(d),
-                        trailing: Wrap(
-                          spacing: 4,
-                          children: [
-                            IconButton(
-                              tooltip: 'Editar',
-                              icon: const Icon(Icons.edit_outlined),
-                              onPressed: () async {
-                                await showEditAppointmentDialog(
-                                  context,
-                                  userApptDoc: d,
-                                  titulo: 'Modificar cita',
-                                );
-                              },
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => mostrarDetalleCita(d),
+                          child: Ink(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  AppColors.specialistStart,
+                                  AppColors.specialistEnd,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            IconButton(
-                              tooltip: 'Eliminar',
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () async {
-                                final fechaTxt = inicio == null
-                                    ? '—'
-                                    : DateFormat('dd/MM/yyyy – HH:mm').format(inicio);
-                                final ok = await showDialog<bool>(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text('Eliminar cita'),
-                                    content: Text('¿Eliminar “$titulo” el $fechaTxt ?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
-                                        child: const Text('Cancelar'),
-                                      ),
-                                      FilledButton.tonal(
-                                        onPressed: () => Navigator.pop(context, true),
-                                        child: const Text('Sí, eliminar'),
-                                      ),
-                                    ],
+                            child: ListTile(
+                              leading: const Icon(
+                                Icons.event_available,
+                                color: AppColors.buttonTeal,
+                              ),
+                              title: Text(
+                                titulo,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(
+                                '$fecha  •  $horaInicio - $horaFin  •  $lugar',
+                              ),
+                              trailing: Wrap(
+                                spacing: 4,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Editar',
+                                    icon: const Icon(Icons.edit_outlined),
+                                    onPressed: () async {
+                                      await showEditAppointmentDialog(
+                                        context,
+                                        userApptDoc: d,
+                                        titulo: 'Modificar cita',
+                                      );
+                                    },
                                   ),
-                                );
-                                if (ok == true && inicio != null) {
-                                  try {
-                                    // 1) Borrar la cita del usuario
-                                    await d.reference.delete();
+                                  IconButton(
+                                    tooltip: 'Eliminar',
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () async {
+                                      final fechaTxt = inicio == null
+                                          ? '—'
+                                          : DateFormat('dd/MM/yyyy – HH:mm')
+                                              .format(inicio);
+                                      final ok = await showDialog<bool>(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          title: const Text('Eliminar cita'),
+                                          content: Text(
+                                              '¿Eliminar “$titulo” el $fechaTxt ?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context, false),
+                                              child: const Text('Cancelar'),
+                                            ),
+                                            FilledButton.tonal(
+                                              onPressed: () =>
+                                                  Navigator.pop(context, true),
+                                              child: const Text('Sí, eliminar'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (ok == true && inicio != null) {
+                                        try {
+                                          // 1) Borrar la cita del usuario
+                                          await d.reference.delete();
 
-                                    // 2) Liberar disponibilidad (borrar doc)
-                                    if (medicoId != null) {
-                                      final dispRef = FirebaseFirestore.instance
-                                          .collection('disponibilidad_medicos')
-                                          .doc(_dispDocId(medicoId, inicio));
-                                      final dispSnap = await dispRef.get();
-                                      if (dispSnap.exists) {
-                                        await dispRef.delete();
-                                      } else {
-                                        final q = await FirebaseFirestore.instance
-                                            .collection('disponibilidad_medicos')
-                                            .where('medicoId', isEqualTo: medicoId)
-                                            .where('fecha',
-                                                isEqualTo: Timestamp.fromDate(_soloDia(inicio)))
-                                            .where('horaInicio',
-                                                isEqualTo: Timestamp.fromDate(inicio))
-                                            .limit(1)
-                                            .get();
-                                        for (final e in q.docs) {
-                                          await e.reference.delete();
+                                          // 2) Liberar disponibilidad (borrar doc)
+                                          if (medicoId != null) {
+                                            final dispRef = FirebaseFirestore.instance
+                                                .collection('disponibilidad_medicos')
+                                                .doc(_dispDocId(medicoId, inicio));
+                                            final dispSnap = await dispRef.get();
+                                            if (dispSnap.exists) {
+                                              await dispRef.delete();
+                                            } else {
+                                              final q = await FirebaseFirestore
+                                                  .instance
+                                                  .collection(
+                                                      'disponibilidad_medicos')
+                                                  .where('medicoId',
+                                                      isEqualTo: medicoId)
+                                                  .where(
+                                                      'fecha',
+                                                      isEqualTo:
+                                                          Timestamp.fromDate(
+                                                              _soloDia(inicio)))
+                                                  .where(
+                                                      'horaInicio',
+                                                      isEqualTo:
+                                                          Timestamp.fromDate(
+                                                              inicio))
+                                                  .limit(1)
+                                                  .get();
+                                              for (final e in q.docs) {
+                                                await e.reference.delete();
+                                              }
+                                            }
+                                          }
+
+                                          // 3) Borrar en colección global `citas` POR ID (si existe)
+                                          final globalRef = FirebaseFirestore.instance
+                                              .collection('citas')
+                                              .doc(d.id);
+                                          final snapGlobal = await globalRef.get();
+                                          if (snapGlobal.exists) {
+                                            await globalRef.delete();
+                                          } else {
+                                            // Fallback para citas viejas sin ID compartido
+                                            try {
+                                              final startTs =
+                                                  Timestamp.fromDate(inicio);
+                                              final endTs = Timestamp.fromDate(
+                                                  inicio.add(const Duration(hours: 1)));
+
+                                              Query gq = FirebaseFirestore.instance
+                                                  .collection('citas')
+                                                  .where('pacienteId',
+                                                      isEqualTo: _uid)
+                                                  .where(
+                                                    'cuando',
+                                                    isGreaterThanOrEqualTo:
+                                                        startTs,
+                                                  )
+                                                  .where(
+                                                    'cuando',
+                                                    isLessThan: endTs,
+                                                  );
+
+                                              if ((medicoId ?? '').isNotEmpty) {
+                                                gq = gq.where('medicoId',
+                                                    isEqualTo: medicoId);
+                                              }
+
+                                              var gdocs = await gq.get();
+
+                                              if (gdocs.docs.isEmpty) {
+                                                gdocs = await FirebaseFirestore
+                                                    .instance
+                                                    .collection('citas')
+                                                    .where('pacienteId',
+                                                        isEqualTo: _uid)
+                                                    .where(
+                                                      'cuando',
+                                                      isEqualTo:
+                                                          Timestamp.fromDate(
+                                                              inicio),
+                                                    )
+                                                    .get();
+                                              }
+
+                                              for (final e in gdocs.docs) {
+                                                await e.reference.delete();
+                                              }
+                                            } catch (_) {}
+                                          }
+
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Cita eliminada y bloque liberado.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Error al eliminar: $e',
+                                                ),
+                                              ),
+                                            );
+                                          }
                                         }
                                       }
-                                    }
-
-                                    // 3) Borrar en colección global `citas` POR ID (si existe)
-                                    final globalRef = FirebaseFirestore.instance
-                                        .collection('citas')
-                                        .doc(d.id);
-                                    final snapGlobal = await globalRef.get();
-                                    if (snapGlobal.exists) {
-                                      await globalRef.delete();
-                                    } else {
-                                      // Fallback para citas viejas creadas sin ID compartido
-                                      try {
-                                        final startTs = Timestamp.fromDate(inicio);
-                                        final endTs =
-                                            Timestamp.fromDate(inicio.add(const Duration(hours: 1)));
-
-                                        Query gq = FirebaseFirestore.instance
-                                            .collection('citas')
-                                            .where('pacienteId', isEqualTo: _uid)
-                                            .where('cuando', isGreaterThanOrEqualTo: startTs)
-                                            .where('cuando', isLessThan: endTs);
-
-                                        if ((medicoId ?? '').isNotEmpty) {
-                                          gq = gq.where('medicoId', isEqualTo: medicoId);
-                                        }
-
-                                        var gdocs = await gq.get();
-
-                                        if (gdocs.docs.isEmpty) {
-                                          gdocs = await FirebaseFirestore.instance
-                                              .collection('citas')
-                                              .where('pacienteId', isEqualTo: _uid)
-                                              .where('cuando',
-                                                  isEqualTo: Timestamp.fromDate(inicio))
-                                              .get();
-                                        }
-
-                                        for (final e in gdocs.docs) {
-                                          await e.reference.delete();
-                                        }
-                                      } catch (_) {}
-                                    }
-
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                            content: Text('Cita eliminada y bloque liberado.')),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Error al eliminar: $e')),
-                                      );
-                                    }
-                                  }
-                                }
-                              },
+                                    },
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),

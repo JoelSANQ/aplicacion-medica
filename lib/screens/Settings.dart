@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:app/routes.dart';
+import 'package:app/theme/app_colors.dart';
 import 'ProfilePage.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
-
-  // Colores principales
-  static const Color kPrimary = Color(0xFF00BCD4);
-  static const Color kLight = Color(0xFFE0F7FA);
-  static const Color kTextDark = Color(0xFF0D2A2E);
 
   void _goProfile(BuildContext context) {
     try {
@@ -46,7 +42,8 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final email = FirebaseAuth.instance.currentUser?.email ?? 'Usuario';
+    final String email =
+        FirebaseAuth.instance.currentUser?.email ?? 'Usuario';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -86,10 +83,10 @@ class SettingsPage extends StatelessWidget {
                       children: [
                         const CircleAvatar(
                           radius: 35,
-                          backgroundColor: kLight,
+                          backgroundColor: AppColors.bgMint,
                           child: Icon(
                             Icons.person,
-                            color: kPrimary,
+                            color: AppColors.buttonTeal,
                             size: 38,
                           ),
                         ),
@@ -98,14 +95,6 @@ class SettingsPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Usuario',
-                                style: TextStyle(
-                                  color: kTextDark,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
                               const SizedBox(height: 4),
                               Text(
                                 email,
@@ -247,14 +236,14 @@ class _SettingsItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color iconBg =
-        isDestructive ? const Color(0xFFFFEBEE) : SettingsPage.kLight;
+        isDestructive ? const Color(0xFFFFEBEE) : AppColors.bgMint;
 
     final Color iconColor =
-        isDestructive ? Colors.red.shade400 : SettingsPage.kPrimary;
+        isDestructive ? Colors.red.shade400 : AppColors.buttonTeal;
 
     final TextStyle textStyle = TextStyle(
       fontWeight: FontWeight.w600,
-      color: isDestructive ? Colors.red.shade500 : SettingsPage.kTextDark,
+      color: isDestructive ? Colors.red.shade500 : AppColors.buttonTeal,
       fontSize: 15,
     );
 
@@ -309,9 +298,9 @@ class _InfoPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SettingsPage.kLight,
+      backgroundColor: AppColors.bgMint,
       appBar: AppBar(
-        backgroundColor: SettingsPage.kPrimary,
+        backgroundColor: AppColors.buttonTeal,
         foregroundColor: Colors.white,
         title: Text(title),
         elevation: 0,
@@ -335,7 +324,7 @@ class _InfoPage extends StatelessWidget {
           style: const TextStyle(
             fontSize: 15,
             height: 1.45,
-            color: SettingsPage.kTextDark,
+            color: AppColors.buttonTeal,
           ),
         ),
       ),

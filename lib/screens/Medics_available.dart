@@ -2,6 +2,34 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:app/theme/app_colors.dart';
+
+class MintButton extends StatelessWidget {
+  final String text;
+  final VoidCallback onPressed;
+
+  const MintButton({
+    super.key,
+    required this.text,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.buttonTeal,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+      ),
+      onPressed: onPressed,
+      child: Text(text),
+    );
+  }
+}
 
 class DoctorAvailabilitySection extends StatefulWidget {
   const DoctorAvailabilitySection({super.key});
@@ -119,9 +147,17 @@ class _DoctorAvailabilitySectionState extends State<DoctorAvailabilitySection> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.buttonTeal,
+                    side: const BorderSide(color: Color.fromARGB(255, 236, 245, 244)),
+                  ),
                   onPressed: _pickDiaDisponibilidad,
-                  icon: const Icon(Icons.today_outlined),
+                  icon: Icon(Icons.today_outlined
+                      , color: AppColors.buttonTeal),
                   label: Text(
+                    
+                    
+                
                     _diaSeleccionado == null ? 'Elegir día' : _fmtFecha(_diaSeleccionado!),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -129,6 +165,10 @@ class _DoctorAvailabilitySectionState extends State<DoctorAvailabilitySection> {
               ),
               const SizedBox(width: 8),
               FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.buttonTeal,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: _checarDia,
                 child: const Text('Checar día'),
               ),

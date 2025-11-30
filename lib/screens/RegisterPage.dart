@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // 👈 Firestore
+import 'package:app/theme/app_colors.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -182,7 +183,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
                               _selectedRole == 'Paciente'
-                                  ? theme.colorScheme.primary
+                                  ? AppColors.buttonTeal
                                   : Colors.grey.shade200,
                           foregroundColor:
                               _selectedRole == 'Paciente'
@@ -203,7 +204,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
                               _selectedRole == 'Medico'
-                                  ? theme.colorScheme.primary
+                                  ? AppColors.buttonTeal
                                   : Colors.grey.shade200,
                           foregroundColor:
                               _selectedRole == 'Medico'

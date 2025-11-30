@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:app/theme/app_colors.dart';
 
 /// ===== Helpers
 DateTime _onlyDate(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -211,11 +212,19 @@ Future<void> showEditAppointmentDialog(
                 Row(
                   children: [
                     TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                      ),
                       onPressed: () => Navigator.pop(dialogCtx),
                       child: const Text('Cancelar'),
+                      
                     ),
                     const Spacer(),
                     FilledButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+                        backgroundColor:  AppColors.buttonTeal,
+                      ),
                       icon: const Icon(Icons.save_outlined),
                       label: const Text('Guardar'),
                       onPressed: () async {
@@ -354,4 +363,113 @@ Future<void> showEditAppointmentDialog(
 
   motivoCtrl.dispose();
   lugarCtrl.dispose();
+}
+
+
+
+Future<void> mostrarDetalleCitaDialog(
+  BuildContext context, {
+  required DocumentSnapshot userApptDoc,
+}) async {
+  final data = userApptDoc.data() as Map<String, dynamic>? ?? {};
+  final DateTime? inicio = (data['cuando'] as Timestamp?)?.toDate();
+  final DateTime? fin = (data['cuandoFin'] as Timestamp?)?.toDate() ??
+      (inicio == null ? null : inicio.add(const Duration(hours: 1)));
+
+  final String medico = data['medicoId']?.toString() ?? '—';
+  final String lugar  = data['lugar']?.toString() ?? '—';
+  final String motivo = data['motivo']?.toString() ?? '—';
+  final String titulo = (data['titulo'] ?? motivo).toString();
+
+  String _fmtFecha(DateTime d) => DateFormat('dd/MM/yyyy').format(d);
+  String _fmtHora(DateTime d)  => DateFormat('HH:mm').format(d);
+
+  await showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: const Color(0xFFF5EDFF), // lilita como en la captura
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Título
+            Text(
+              titulo,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+
+            // Médico
+            Row(
+              children: [
+                const Icon(Icons.person_pin, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Médico: $medico')),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // Lugar
+            Row(
+              children: [
+                const Icon(Icons.place_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Lugar: $lugar')),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // Horario
+            Row(
+              children: [
+                const Icon(Icons.access_time, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    (inicio == null)
+                        ? 'Horario: —'
+                        : 'Horario: ${_fmtFecha(inicio)}  '
+                          '${_fmtHora(inicio)} - ${_fmtHora(fin!)}',
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // Motivo
+            Text('Motivo: $motivo'),
+
+            const SizedBox(height: 16),
+
+            // Botones abajo: Cerrar / Editar
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cerrar'),
+                ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Editar'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await showEditAppointmentDialog(
+                      context,
+                      userApptDoc: userApptDoc,
+                      titulo: 'Modificar cita',
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

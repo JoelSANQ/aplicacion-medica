@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-
+import 'package:app/theme/app_colors.dart';
+import 'edit_appointment_dialog.dart';
 import 'LoginPage.dart';
 import 'package:app/routes.dart';
 import 'package:app/screens/messages.dart';
@@ -12,6 +13,7 @@ import 'Settings.dart';
 import 'package:app/screens/MYAPPOINTMENTS.DART'; // MyAppointmentsPage
 import 'create_appointment_dialog.dart';
 import 'package:app/medic/Dashboard.dart';
+
 
 class _MyScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -33,15 +35,6 @@ class AppointmentHomePage extends StatefulWidget {
 
 class _AppointmentHomePageState extends State<AppointmentHomePage> {
   int _navIndex = 0; // 0=Inicio, 1=Mensajes, 2=?, 3=?
-
-  // paleta verdosa
-  static const Color kBgMint = Color(0xFFE8F5E9);
-  static const Color kCardMintStart = Color(0xFFB2DFDB);
-  static const Color kCardMintEnd = Color(0xFFE0F2F1);
-  static const Color kButtonTeal = Color(0xFF0F766E);
-  static const Color kButtonTealLight = Color(0xFF14B8A6);
-  static const Color kSpecialistStart = Color(0xFFE0F2F1);
-  static const Color kSpecialistEnd = Color(0xFFC8E6C9);
 
   // rol actual del usuario
   String? _role; // 'Paciente' o 'Medico'
@@ -65,7 +58,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
           child: Ink(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [kSpecialistStart, kSpecialistEnd],
+                colors: [AppColors.specialistStart, AppColors.specialistEnd],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -215,7 +208,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
             child: Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [kCardMintStart, kCardMintEnd],
+                  colors: [AppColors.cardMintStart, AppColors.cardMintEnd],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -230,7 +223,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                   const CircleAvatar(
                     radius: 28,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 28, color: kButtonTeal),
+                    child: Icon(Icons.person, size: 28, color: AppColors.buttonTeal),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -295,7 +288,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kButtonTealLight ,
+                    backgroundColor: AppColors.buttonTealLight ,
                     foregroundColor: Colors.white,
                     elevation: 6,
                     shadowColor: Colors.black45,
@@ -315,7 +308,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kButtonTealLight,
+                    backgroundColor: AppColors.buttonTealLight,
                     foregroundColor: Colors.white,
                     elevation: 6,
                     shadowColor: Colors.black45,
@@ -340,7 +333,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kButtonTeal,
+                  backgroundColor: AppColors.buttonTeal,
                   foregroundColor: Colors.white,
                   elevation: 6,
                   shadowColor: Colors.black45,
@@ -368,7 +361,7 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: kButtonTealLight,
+                backgroundColor: AppColors.buttonTealLight,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 elevation: 2,
@@ -610,21 +603,52 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
                   final fecha = dt == null ? '—' : DateFormat('dd/MM/yyyy').format(dt);
                   final hora = dt == null ? '—' : DateFormat('hh:mm a').format(dt);
 
-                  return Card(
-                    color: const Color(0xFFF1FAF5),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      leading: const Icon(Icons.medical_services_outlined,
-                          color: kButtonTeal),
-                      title: Text(titulo),
-                      subtitle: Text('$fecha  •  $hora  •  $lugar'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-                      onTap: () {},
+                 return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => mostrarDetalleCitaDialog(
+                          context,
+                          userApptDoc: d,
+                        ),
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.specialistStart, AppColors.specialistEnd],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+
+                            leading: const Icon(
+                              Icons.medical_services_outlined,
+                              color: AppColors.buttonTeal,
+                            ),
+
+                            title: Text(
+                              titulo,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text('$fecha  •  $hora  •  $lugar'),
+                          ),
+                        ),
+                      ),
                     ),
                   );
+
                 }).toList(),
               );
             },
@@ -681,18 +705,11 @@ class _AppointmentHomePageState extends State<AppointmentHomePage> {
 
     final currentBody = pages[currentIndex];
 
-    // AppBar visible / no visible
-    final bool hideAppBar = isMedico
-        ? (currentIndex == 3) // Médico: solo Ajustes sin AppBar
-        : (currentIndex == 2 || currentIndex == 3); // Paciente: Mis citas y Ajustes
 
     return Scaffold(
-      backgroundColor: kBgMint,
-      appBar: hideAppBar
-          ? null
-          : AppBar(
-              title: const Text('Citas Médicas'),
-              backgroundColor: kButtonTeal,
+      backgroundColor: AppColors.bgMint,
+      appBar: AppBar(
+              backgroundColor: AppColors.buttonTeal,
             ),
       body: currentBody,
       bottomNavigationBar: BottomNavigationBar(

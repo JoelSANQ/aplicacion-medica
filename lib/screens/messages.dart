@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart'; // 👈 Necesario para PointerDeviceKind
+import 'package:app/theme/app_colors.dart';
 
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key});
@@ -80,7 +81,7 @@ class _MessagesPageState extends State<MessagesPage> {
                 hintText: 'Buscar doctor o especialidad...',
                 prefixIcon: const Icon(Icons.search, size: 26),
                 filled: true,
-                fillColor: const Color(0xFFF3F6F9),
+                fillColor: AppColors.bgMint,
                 contentPadding: const EdgeInsets.symmetric(vertical: 18),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -117,7 +118,7 @@ class _MessagesPageState extends State<MessagesPage> {
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE0F7FA),
+                        color: AppColors.cardMintStart,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.black, width: 1.2),
                         boxShadow: const [
@@ -132,7 +133,7 @@ class _MessagesPageState extends State<MessagesPage> {
                         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         leading: CircleAvatar(
                           radius: 28,
-                          backgroundColor: const Color(0xFF00BCD4),
+                          backgroundColor: AppColors.buttonTeal,
                           child: Text(
                             chat['avatar']!,
                             style: const TextStyle(fontSize: 24, color: Colors.white),
